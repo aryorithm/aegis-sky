@@ -4,14 +4,19 @@
 #include <QQmlContext>
 #include "backend/app/StationApp.h"
 #include "backend/comms/CoreClient.h"
+#include "backend/video/VideoReceiver.h"
+
 
 int main(int argc, char *argv[])
 {
+
+
     QGuiApplication app(argc, argv);
 
     // Register the CoreClient type so QML can instantiate it
     qmlRegisterType<aegis::station::comms::CoreClient>("Aegis.Backend", 1, 0, "CoreClient");
 
+    qmlRegisterType<aegis::station::video::VideoReceiver>("Aegis.Backend", 1, 0, "VideoReceiver");
     QQmlApplicationEngine engine;
     
     // Load Main QML
