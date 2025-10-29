@@ -45,4 +45,9 @@ namespace aegis::station::protocol {
         float velocity;
         bool is_threat;
     };
+
+
+
+
+    
 }
