@@ -1,18 +1,18 @@
 #pragma once
 #include <glm/glm.hpp>
-#include <vector>
+#include <glm/gtc/quaternion.hpp>
 #include <string>
+#include <vector>
 #include <queue>
 
 namespace aegis::sim::engine {
 
+    enum class EntityType { QUADCOPTER, FIXED_WING, BIRD, UNKNOWN };
 
-    
-    enum class EntityType {
-        QUADCOPTER,
-        FIXED_WING,
-        BIRD,
-        UNKNOWN
+    struct MicroDopplerProfile {
+        double blade_speed_mps = 0.0; // Tip speed
+        double blade_rate_hz = 0.0;   // Rotation rate
+        bool is_flapping = false;     // Bird vs Rotor
     };
 
     class SimEntity {
@@ -20,34 +20,45 @@ namespace aegis::sim::engine {
         SimEntity(const std::string& name, glm::dvec3 start_pos);
         virtual ~SimEntity() = default;
 
-        // Updates position based on Waypoints and Speed
         void update(double dt);
 
-        // Configuration Setters
+        // Configuration
         void set_type(EntityType t) { type_ = t; }
         void set_rcs(double rcs) { rcs_ = rcs; }
-        void set_speed(double m_s) { speed_ = m_s; }
+        void set_speed(double s) { speed_ = s; }
+        void set_temperature(double c) { temperature_k_ = c + 273.15; }
+        void set_velocity(glm::dvec3 v) { velocity_ = v; }
+        void set_position(glm::dvec3 p) { position_ = p; }
+        
+        // Micro-Doppler Config
+        void set_micro_doppler(double speed, double hz, bool flap);
+
+        // Pathing
         void add_waypoint(glm::dvec3 wp);
 
-        void set_temperature(double temp_c) { temperature_k_ = temp_c + 273.15; }
-double get_temperature() const { return temperature_k_; }
         // Getters
         glm::dvec3 get_position() const { return position_; }
         glm::dvec3 get_velocity() const { return velocity_; }
         double get_rcs() const { return rcs_; }
+        double get_temperature() const { return temperature_k_; }
+        std::string get_name() const { return name_; }
+
+        // Physics Calculation
+        double get_instant_doppler_mod(double time) const;
 
     private:
         std::string name_;
         EntityType type_;
         
-        // Physics State
         glm::dvec3 position_;
         glm::dvec3 velocity_;
-        double rcs_;   // Radar Cross Section
-        double speed_; // Max speed
+        
+        double rcs_ = 0.01;
+        double speed_ = 10.0;
+        double temperature_k_ = 300.0;
+        
+        MicroDopplerProfile micro_doppler_;
 
-        // AI Pathing
         std::queue<glm::dvec3> waypoints_;
-        bool has_reached_destination_;
     };
 }
