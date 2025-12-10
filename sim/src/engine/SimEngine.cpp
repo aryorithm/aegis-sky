@@ -1,10 +1,12 @@
 #include "sim/engine/SimEngine.h"
+
 #include "sim/engine/ScenarioLoader.h"
 #include "sim/bridge_server/ShmWriter.h"
 #include "sim/phenomenology/optics/MockRenderer.h"
 #include "sim/physics/RadarPhysics.h"
 #include "sim/physics/GimbalPhysics.h"
 #include "sim/engine/Environment.h"
+#include "sim/engine/WeatherSystem.h"
 #include "sim/math/Random.h" 
 
 #include <spdlog/spdlog.h>
@@ -13,158 +15,155 @@
 
 namespace aegis::sim::engine {
 
+    // Simple Projectile Struct (Kinetic Interceptor)
     struct Projectile {
-        glm::dvec3 position;
-        glm::dvec3 velocity;
+        glm::dvec3 pos;
+        glm::dvec3 vel;
         bool active = true;
         double age = 0.0;
     };
 
     SimEngine::SimEngine() : is_running_(false), is_headless_(false) {
         math::Random::init();
+
         bridge_ = std::make_unique<bridge::ShmWriter>();
         renderer_ = std::make_unique<phenomenology::MockRenderer>(1920, 1080);
         environment_ = std::make_unique<Environment>();
         
-        // Add Ground Plane (Implicit at Y=0)
-        environment_->add_building(glm::dvec3(0, 10, 200), glm::dvec3(50, 20, 10)); // Warehouse
+        // Add "Warehouse" Obstacle
+        environment_->add_building(glm::dvec3(0, 15, 200), glm::dvec3(60, 30, 20));
 
+        // Physics Configs
         drone_phys_config_ = {1.2, 0.3, 30.0};
         radar_config_ = {120.0, 30.0, 2000.0, 0.5, 0.01, 0.2};
-        global_wind_ = glm::dvec3(2.0, 0.0, 1.0);
+        global_wind_ = glm::dvec3(3.0, 0.0, 1.5);
     }
 
     SimEngine::~SimEngine() { if (bridge_) bridge_->cleanup(); }
 
     void SimEngine::initialize(const std::string& scenario_path) {
         entities_ = ScenarioLoader::load_mission(scenario_path);
-        if (entities_.empty()) throw std::runtime_error("No entities.");
+        if (entities_.empty()) throw std::runtime_error("Empty Mission.");
         if (!bridge_->initialize()) throw std::runtime_error("Bridge Failed.");
+        
         is_running_ = true;
+        spdlog::info("[Sim] Engine Online. Occlusion: ON. EW: ON.");
     }
 
     void SimEngine::run() {
-        spdlog::info("[Sim] Engine Started. Headless: {}", is_headless_);
-        
-        glm::dvec3 sensor_pos(0, 0, 0); 
         std::vector<Projectile> projectiles;
-        
+        glm::dvec3 sensor_pos(0,0,0);
+
         while (is_running_) {
+            // --- 0. TIME & WEATHER ---
             time_manager_.tick();
             double dt = time_manager_.get_delta_time();
+            double now = time_manager_.get_total_time();
             uint64_t frame = time_manager_.get_frame_count();
 
-            // 1. INPUT
+            // Dynamic Storm (Example)
+            if (now > 10.0) weather_.set_condition(20.0, 0.2, 5.0); // Rain 20mm/hr
+
+            // --- 1. BRIDGE INPUT ---
             ipc::ControlCommand cmd = bridge_->get_latest_command();
-            
-            // 2. FIRE CONTROL (Kinetic Physics)
+
+            // --- 2. FIRE CONTROL (Projectiles) ---
             if (cmd.fire_trigger) {
-                // Simple cooldown check
-                static double last_fire = 0;
-                if (time_manager_.get_total_time() - last_fire > 0.1) { // 600 RPM
+                // Rate limiter 10Hz
+                static double last_shot = 0;
+                if (now - last_shot > 0.1) {
                     Projectile p;
-                    p.position = sensor_pos;
-                    p.velocity = gimbal_.get_forward_vector() * 800.0; // 800 m/s
+                    p.pos = sensor_pos;
+                    p.vel = gimbal_.get_forward_vector() * 800.0; // 800m/s
                     projectiles.push_back(p);
-                    last_fire = time_manager_.get_total_time();
+                    last_shot = now;
+                    spdlog::info("💥 SHOT FIRED");
                 }
             }
-
-            // Update Projectiles
+            
+            // Projectile Physics & Collision
             for (auto& p : projectiles) {
                 if (!p.active) continue;
-                p.velocity.y += -9.81 * dt; // Gravity
-                p.position += p.velocity * dt;
+                p.vel.y += -9.81 * dt; // Gravity
+                p.pos += p.vel * dt;
                 p.age += dt;
+                
+                // Ground Hit / Timeout
+                if (p.pos.y < 0 || p.age > 4.0) p.active = false;
 
-                // Check Kill
-                for (auto& entity : entities_) {
-                    if (glm::distance(p.position, entity->get_position()) < 1.0) {
-                        spdlog::critical("🎯 TARGET DESTROYED: {}", entity->get_name());
-                        // Teleport entity away or mark dead
-                        entity->set_position(glm::dvec3(0, -1000, 0)); 
+                // Drone Hit
+                for (auto& e : entities_) {
+                    if (glm::distance(p.pos, e->get_position()) < 1.0) {
+                        spdlog::critical("🎯 KILL CONFIRMED: {}", e->get_name());
+                        e->set_position(glm::dvec3(0, -9000, 0)); // Teleport away
                         p.active = false;
                     }
                 }
-                if (p.position.y < 0 || p.age > 5.0) p.active = false;
             }
 
-
-
-
-
-            // 3. GIMBAL & DRONE PHYSICS
+            // --- 3. HARDWARE UPDATE ---
             gimbal_.update(dt, cmd.pan_velocity, cmd.tilt_velocity);
             glm::dvec3 sensor_facing = gimbal_.get_forward_vector();
 
-            for (auto& entity : entities_) {
-                physics::DroneDynamics::apply_physics(*entity, drone_phys_config_, dt);
-                // Wind
-                glm::dvec3 gust(math::Random::gaussian(0.2), math::Random::gaussian(0.1), math::Random::gaussian(0.2));
-                entity->set_velocity(entity->get_velocity() + (global_wind_ * 0.05 + gust) * dt);
-                entity->update(dt);
+            // --- 4. DRONE PHYSICS ---
+            for (auto& e : entities_) {
+                physics::DroneDynamics::apply_physics(*e, drone_phys_config_, dt);
+                // Wind + Gusts
+                glm::dvec3 gust(math::Random::gaussian(0.5), math::Random::gaussian(0.2), math::Random::gaussian(0.5));
+                e->set_velocity(e->get_velocity() + (global_wind_ * 0.1 + gust) * dt);
+                e->update(dt);
             }
 
-            // 4. RADAR STEP (Multipath Enabled)
+            // --- 5. RADAR SENSOR ---
             std::vector<ipc::SimRadarPoint> radar_hits;
-            double noise_floor = physics::RadarPhysics::calculate_environment_noise(entities_, sensor_pos);
+            double noise = physics::RadarPhysics::calculate_environment_noise(entities_, sensor_pos);
+            
+            for (auto& e : entities_) {
+                if (environment_->check_occlusion(sensor_pos, e->get_position())) continue;
 
-            for (auto& entity : entities_) {
-                if (environment_->check_occlusion(sensor_pos, entity->get_position())) continue;
+                // Scan (Returns Direct + Multipath ghosts)
+                auto returns = physics::RadarPhysics::scan_target(
+                    sensor_pos, sensor_facing, *e, radar_config_, noise, weather_.get_state()
+                );
 
-                // ** NEW: Scan for Multipath **
-                // We assume scan_target returns a vector (Direct + Ghost)
-                // (Using the logic described in the thought process above)
-                auto result = physics::RadarPhysics::cast_ray(sensor_pos, sensor_facing, *entity, radar_config_, noise_floor);
-                
-                if (result.detected) {
+                for (const auto& ret : returns) {
                     ipc::SimRadarPoint hit;
-                    // ... [Conversion to IPC struct] ...
-                    // Add Multipath Ghost if low altitude (y < 10m)
-                    if (entity->get_position().y < 10.0) {
-                        // 50% chance of ghost
-                        if (math::Random::uniform(0, 1) > 0.5) {
-                            ipc::SimRadarPoint ghost = hit;
-                            ghost.y = -hit.y; // Mirror
-                            ghost.snr_db -= 6.0;
-                            radar_hits.push_back(ghost);
-                        }
-                    }
+                    // Polar to Cartesian (Simulating raw detection)
+                    hit.x = ret.range * sin(ret.azimuth) * cos(ret.elevation);
+                    hit.y = ret.range * sin(ret.elevation);
+                    hit.z = ret.range * cos(ret.azimuth) * cos(ret.elevation);
+                    hit.velocity = ret.velocity;
+                    hit.snr_db = ret.snr_db;
+                    hit.object_id = 1; 
                     radar_hits.push_back(hit);
                 }
             }
 
-            // 5. VISION STEP
+            // --- 6. VISION SENSOR ---
             if (!is_headless_) {
+                // Auto-Switch Day/Night based on Sun
+                // For MVP: Toggle manually or based on time. 
+                // Let's assume VISIBLE unless commanded otherwise.
+                renderer_->set_render_mode(phenomenology::RenderMode::VISIBLE);
+                
                 renderer_->set_camera_orientation(sensor_facing);
+                renderer_->set_sun_position(glm::normalize(glm::dvec3(0.5, 1.0, -0.5)));
                 renderer_->clear();
-                for (auto& entity : entities_) {
-                    if (!environment_->check_occlusion(sensor_pos, entity->get_position()))
-                        renderer_->render_entity(*entity, sensor_pos);
+                
+                for (auto& e : entities_) {
+                    if (!environment_->check_occlusion(sensor_pos, e->get_position())) {
+                        renderer_->render_entity(*e, sensor_pos);
+                    }
                 }
+                
+                renderer_->apply_environmental_effects(weather_.get_state().fog_density);
             }
 
-            // 6. BRIDGE
-            bridge_->publish_frame(frame, time_manager_.get_total_time(), radar_hits);
+            // --- 7. BRIDGE ---
+            bridge_->publish_frame(frame, now, radar_hits);
 
-            // 7. PACING
-            if (!is_headless_) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-
-            //TODO START SHOULD BE REMOVED AFTER CORE SECTION
-            // HACK TO TEST PROJECTILES
-            if (frame % 200 == 0) { // Every 2 seconds
-                Projectile p;
-                p.position = glm::dvec3(0,0,0);
-                // Fire at the first entity found
-                if (!entities_.empty()) {
-                    glm::dvec3 target = entities_[0]->get_position();
-                    p.velocity = glm::normalize(target) * 800.0; // Shoot at it
-                }
-                projectiles_.push_back(p);
-            }
-            //TODO END SHOULD BE REMOVED AFTER CORE SECTION
+            // --- 8. PACING ---
+            if (!is_headless_) std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
     
