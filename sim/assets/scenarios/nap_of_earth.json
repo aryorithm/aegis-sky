@@ -1,0 +1,21 @@
+{
+    "mission_name": "Nap-of-the-Earth Infiltration",
+    "entities": [
+        {
+            "name": "Helo-1",
+            "type": "FIXED_WING",
+            "rcs": 2.0,
+            "speed": 40.0,
+            "start_pos": [-500.0, 15.0, 0.0],
+            "waypoints": [
+                [500.0, 15.0, 0.0]
+            ],
+            // Micro-Doppler Config
+            "micro_doppler": {
+                "blade_speed": 200.0,
+                "rpm": 400.0,
+                "is_flap": false
+            }
+        }
+    ]
+}
