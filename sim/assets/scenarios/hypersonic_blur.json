@@ -1,0 +1,21 @@
+{
+    "mission_name": "Hypersonic Tangential Pass",
+    "entities": [
+        {
+            "name": "Kinetic-Kill-Vehicle",
+            "type": "FIXED_WING",
+            "rcs": 0.05,
+            "temperature_c": 200.0,
+            "speed": 150.0,
+            "start_pos": [-800.0, 20.0, 50.0],
+            "waypoints": [
+                [800.0, 20.0, 50.0]
+            ],
+            "micro_doppler": {
+                "blade_speed": 0.0, // Jet engine, no blades
+                "blade_rate_hz": 0.0,
+                "is_flapping": false
+            }
+        }
+    ]
+}
