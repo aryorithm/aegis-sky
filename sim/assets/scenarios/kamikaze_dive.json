@@ -1,0 +1,17 @@
+{
+    "mission_name": "Vertical Dive Attack",
+    "entities": [
+        {
+            "name": "Dive-Bomber",
+            "type": "QUADCOPTER",
+            "rcs": 0.05,
+            "temperature_c": 45.0,
+            "speed": 0.0,
+            "start_pos": [10.0, 500.0, 10.0],
+            "waypoints": [
+                [0.0, 0.0, 0.0]
+            ],
+            "velocity": [0.0, -40.0, 0.0] 
+        }
+    ]
+}
