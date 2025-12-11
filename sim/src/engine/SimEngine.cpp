@@ -89,6 +89,10 @@ namespace aegis::sim::engine {
                 if (p.position.y < 0 || p.age > 5.0) p.active = false;
             }
 
+
+
+
+
             // 3. GIMBAL & DRONE PHYSICS
             gimbal_.update(dt, cmd.pan_velocity, cmd.tilt_velocity);
             glm::dvec3 sensor_facing = gimbal_.get_forward_vector();
@@ -147,6 +151,20 @@ namespace aegis::sim::engine {
             if (!is_headless_) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
+
+            //TODO START SHOULD BE REMOVED AFTER CORE SECTION
+            // HACK TO TEST PROJECTILES
+            if (frame % 200 == 0) { // Every 2 seconds
+                Projectile p;
+                p.position = glm::dvec3(0,0,0);
+                // Fire at the first entity found
+                if (!entities_.empty()) {
+                    glm::dvec3 target = entities_[0]->get_position();
+                    p.velocity = glm::normalize(target) * 800.0; // Shoot at it
+                }
+                projectiles_.push_back(p);
+            }
+            //TODO END SHOULD BE REMOVED AFTER CORE SECTION
         }
     }
     
