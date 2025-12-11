@@ -1,0 +1,14 @@
+{
+    "mission_name": "Attack Out of the Sun",
+    "entities": [
+        {
+            "name": "Solar-Warrior",
+            "type": "FIXED_WING",
+            "rcs": 0.1,
+            "start_pos": [500.0, 500.0, 500.0], 
+            "waypoints": [[0.0, 0.0, 0.0]],
+            "speed": 60.0
+        }
+    ]
+    // Note: Assuming Sun is at Vector(1, 1, 1)
+}
