@@ -1,0 +1,16 @@
+{
+    "mission_name": "Close Air Support Pass",
+    "entities": [
+        {
+            "name": "Mach-Drone",
+            "type": "FIXED_WING",
+            "rcs": 0.1,
+            "temperature_c": 60.0,
+            "speed": 60.0,
+            "start_pos": [-400.0, 20.0, 50.0],
+            "waypoints": [
+                [400.0, 20.0, 50.0]
+            ]
+        }
+    ]
+}
