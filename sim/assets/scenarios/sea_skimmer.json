@@ -1,0 +1,27 @@
+{
+    "mission_name": "Low Altitude Sea Skimmer",
+    "entities": [
+        {
+            "name": "Missile-Sim-1",
+            "type": "FIXED_WING",
+            "rcs": 0.5,
+            "temperature_c": 120.0,
+            "speed": 35.0,
+            "start_pos": [-500.0, 5.0, 800.0],
+            "waypoints": [
+                [0.0, 5.0, 0.0]
+            ]
+        },
+        {
+            "name": "Missile-Sim-2",
+            "type": "FIXED_WING",
+            "rcs": 0.5,
+            "temperature_c": 120.0,
+            "speed": 35.0,
+            "start_pos": [500.0, 8.0, 800.0],
+            "waypoints": [
+                [0.0, 8.0, 0.0]
+            ]
+        }
+    ]
+}
