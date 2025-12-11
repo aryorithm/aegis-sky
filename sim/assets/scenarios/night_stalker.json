@@ -1,0 +1,27 @@
+{
+    "mission_name": "Night Stalker (Thermal Test)",
+    "entities": [
+        {
+            "name": "Stealth-Glider",
+            "type": "FIXED_WING",
+            "rcs": 0.001,
+            "temperature_c": 85.0,
+            "speed": 25.0,
+            "start_pos": [-300.0, 100.0, 800.0],
+            "waypoints": [
+                [300.0, 50.0, 600.0]
+            ]
+        },
+        {
+            "name": "Cold-Bird",
+            "type": "BIRD",
+            "rcs": 0.005,
+            "temperature_c": 38.0, 
+            "speed": 10.0,
+            "start_pos": [-320.0, 90.0, 810.0],
+            "waypoints": [
+                [300.0, 90.0, 610.0]
+            ]
+        }
+    ]
+}
