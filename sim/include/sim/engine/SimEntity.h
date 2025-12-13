@@ -6,6 +6,8 @@
 
 namespace aegis::sim::engine {
 
+
+    
     enum class EntityType {
         QUADCOPTER,
         FIXED_WING,
@@ -27,6 +29,8 @@ namespace aegis::sim::engine {
         void set_speed(double m_s) { speed_ = m_s; }
         void add_waypoint(glm::dvec3 wp);
 
+        void set_temperature(double temp_c) { temperature_k_ = temp_c + 273.15; }
+double get_temperature() const { return temperature_k_; }
         // Getters
         glm::dvec3 get_position() const { return position_; }
         glm::dvec3 get_velocity() const { return velocity_; }
