@@ -1,0 +1,16 @@
+{
+    "mission_name": "FOV Breach Test",
+    "entities": [
+        {
+            "name": "Kamikaze-1",
+            "type": "FIXED_WING",
+            "rcs": 0.05,
+            "speed": 30.0,
+            "start_pos": [0.0, 50.0, 500.0],
+            "waypoints": [
+                [0.0, 50.0, 0.0],
+                [0.0, 50.0, -200.0]
+            ]
+        }
+    ]
+}
