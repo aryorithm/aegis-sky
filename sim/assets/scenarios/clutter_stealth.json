@@ -1,0 +1,15 @@
+{
+    "mission_name": "Low Altitude Stealth",
+    "entities": [
+        {
+            "name": "Plastic-DJI-Mini",
+            "type": "QUADCOPTER",
+            "rcs": 0.005,
+            "speed": 5.0,
+            "start_pos": [-100.0, 5.0, 300.0],
+            "waypoints": [
+                [100.0, 5.0, 200.0]
+            ]
+        }
+    ]
+}
