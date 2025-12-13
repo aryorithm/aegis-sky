@@ -34,6 +34,8 @@ struct ControlCommand {
         // Synchronization Primitive (Simple Spinlock)
         // 0 = Writing, 1 = Ready to Read
         volatile uint32_t state_flag; 
+            uint32_t control_offset; // Offset in bytes to the ControlCommand struct
+
     };
 
     // The Memory Layout:
