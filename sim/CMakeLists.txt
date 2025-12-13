@@ -16,9 +16,12 @@ add_executable(aegis_sim
     src/main.cpp
     src/engine/TimeManager.cpp
     src/engine/SimEntity.cpp
-    src/engine/SimEngine.cpp
-    src/physics/DroneDynamics.cpp  # NEW
-    src/physics/RadarPhysics.cpp   # NEW
+    src/engine/SimEngine.cpp       # <--- THIS FILE
+    src/engine/ScenarioLoader.cpp
+    src/physics/DroneDynamics.cpp
+    src/physics/RadarPhysics.cpp
+    src/bridge_server/ShmWriter.cpp
+    src/phenomenology/optics/MockRenderer.cpp
 )
 
 # Link Libraries
