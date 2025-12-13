@@ -1,0 +1,9 @@
+{
+  "name": "aegis-sky",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "glm",
+    "nlohmann-json",
+    "spdlog"
+  ]
+}
