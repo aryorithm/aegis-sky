@@ -1,0 +1,29 @@
+{
+    "mission_name": "Biological Clutter Test",
+    "entities": [
+        {
+            "name": "Seagull-1",
+            "type": "BIRD",
+            "rcs": 0.001,
+            "start_pos": [10.0, 30.0, 200.0],
+            "waypoints": [[50.0, 40.0, 100.0]],
+            "speed": 8.0
+        },
+        {
+            "name": "Seagull-2",
+            "type": "BIRD",
+            "rcs": 0.001,
+            "start_pos": [-10.0, 35.0, 210.0],
+            "waypoints": [[-40.0, 30.0, 100.0]],
+            "speed": 7.5
+        },
+        {
+            "name": "Spy-Drone",
+            "type": "QUADCOPTER",
+            "rcs": 0.015,
+            "start_pos": [0.0, 32.0, 220.0],
+            "waypoints": [[0.0, 32.0, 50.0]],
+            "speed": 6.0
+        }
+    ]
+}
