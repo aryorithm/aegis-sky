@@ -1,57 +1,92 @@
 #include "sim/physics/RadarPhysics.h"
-#include <glm/gtx/intersect.hpp> // GLM Ray Intersections
+#include <glm/gtx/norm.hpp> // For length2
+#include <cmath>
+#include <algorithm>
 
 namespace aegis::sim::physics {
+
+    // -------------------------------------------------------------------------
+    // RADAR CONSTANTS (Approximation of a 4D AESA Radar)
+    // -------------------------------------------------------------------------
+    static constexpr double TX_POWER_WATTS = 200.0;     // Transmit Power
+    static constexpr double SYSTEM_LOSS = 0.5;          // System efficiency
+    static constexpr double NOISE_FLOOR_WATTS = 1e-13;  // Thermal noise floor
+    
+    // For Hitbox detection (Simplified Sphere)
+    static constexpr double HITBOX_RADIUS = 0.5;        // Meters
 
     RadarReturn RadarPhysics::cast_ray(
         const glm::dvec3& radar_pos, 
         const glm::dvec3& beam_dir, 
         const engine::SimEntity& target
     ) {
-        RadarReturn ret = {false, 0, 0, 0, 0, -100.0};
+        RadarReturn ret = {false, 0.0, 0.0, 0.0, 0.0, -100.0};
 
-        // 1. Simplified Geometry: Treat drone as a Sphere for Raycasting
-        // GLM doesn't have double-precision intersectRaySphere in all versions, 
-        // but let's implement the math using GLM vector ops.
+        // ---------------------------------------------------------------------
+        // 1. GEOMETRY: Ray-Sphere Intersection
+        // ---------------------------------------------------------------------
+        // Vector from Radar (Origin) to Target Center
+        glm::dvec3 L = target.get_position() - radar_pos;
         
-        glm::dvec3 target_pos = target.get_position();
-        double target_radius = 0.3; // 30cm drone
+        // Project L onto the beam direction (How far along the ray is the closest point?)
+        double t_closest = glm::dot(L, beam_dir);
 
-        glm::dvec3 m = radar_pos - target_pos;
-        double b = glm::dot(m, beam_dir);
-        double c = glm::dot(m, m) - target_radius * target_radius;
+        // If t_closest < 0, the target is behind the radar
+        if (t_closest < 0.0) return ret;
 
-        // Exit if ray origin is outside sphere (c > 0) and ray points away from sphere (b > 0)
-        if (c > 0.0 && b > 0.0) return ret;
+        // Distance squared from Target Center to the Ray Line
+        double d2 = glm::length2(L) - (t_closest * t_closest);
+        double r2 = HITBOX_RADIUS * HITBOX_RADIUS;
 
-        double discr = b*b - c;
+        // If distance squared > radius squared, the ray missed the target
+        if (d2 > r2) return ret;
 
-        // A negative discriminant corresponds to no intersection
-        if (discr < 0.0) return ret;
-
-        // 2. HIT DETECTED
+        // ---------------------------------------------------------------------
+        // 2. HIT CONFIRMED - Calculate Polar Coordinates
+        // ---------------------------------------------------------------------
         ret.detected = true;
-        ret.range = glm::distance(radar_pos, target_pos);
-
-        // 3. Calculate Angles (Azimuth/Elevation)
-        glm::dvec3 to_target = glm::normalize(target_pos - radar_pos);
-        ret.azimuth = atan2(to_target.x, to_target.z);
-        ret.elevation = asin(to_target.y);
-
-        // 4. Calculate Doppler Velocity
-        // Project target velocity onto the "Line of Sight" vector
-        // Formula: v_radial = dot(v_target, normalize(pos_target - pos_radar))
-        glm::dvec3 los_vector = glm::normalize(target_pos - radar_pos);
-        ret.velocity = glm::dot(target.get_velocity(), los_vector);
-
-        // 5. Calculate SNR (Radar Equation simplified)
-        // Power drops with 1/R^4
-        double r4 = ret.range * ret.range * ret.range * ret.range;
-        double rcs = 0.01; // Drone Radar Cross Section (m^2)
-        double tx_power = 1000.0; 
         
-        double power_received = (tx_power * rcs) / (r4 + 1e-6);
-        ret.snr_db = 10.0 * log10(power_received);
+        // Exact distance to the surface of the target
+        double dist_to_surface = sqrt(r2 - d2);
+        ret.range = t_closest - dist_to_surface;
+
+        // Sanity check (don't detect things inside the radar)
+        if (ret.range < 1.0) { ret.detected = false; return ret; }
+
+        // Calculate Relative Vector for Angles
+        glm::dvec3 to_target = glm::normalize(target.get_position() - radar_pos);
+        
+        // Azimuth (Horizontal Angle): atan2(x, z) assumes Forward is Z+
+        ret.azimuth = std::atan2(to_target.x, to_target.z);
+        
+        // Elevation (Vertical Angle): arcsin(y)
+        ret.elevation = std::asin(to_target.y);
+
+        // ---------------------------------------------------------------------
+        // 3. DOPPLER PHYSICS
+        // ---------------------------------------------------------------------
+        // Radial Velocity is the projection of Target Velocity onto the Line-of-Sight
+        // v_radial = dot(v_target, normalize(pos_target - pos_radar))
+        // Positive = Moving Away, Negative = Closing In
+        ret.velocity = glm::dot(target.get_velocity(), to_target);
+
+        // ---------------------------------------------------------------------
+        // 4. SIGNAL STRENGTH (The Radar Equation)
+        // ---------------------------------------------------------------------
+        // Pr = (Pt * G^2 * lambda^2 * RCS) / ((4*pi)^3 * R^4)
+        // Simplified proportionality: Pr ~ (RCS / R^4)
+        
+        double range_4 = ret.range * ret.range * ret.range * ret.range;
+        
+        // CRITICAL: Use the entity's specific RCS (Bird vs Drone)
+        double rcs = target.get_rcs(); 
+
+        // Calculate received power (Simplified Model)
+        double power_received = (TX_POWER_WATTS * rcs) / (range_4 + 1e-9);
+
+        // Convert to Decibels (dB)
+        // SNR = 10 * log10(Signal / Noise)
+        ret.snr_db = 10.0 * std::log10(power_received / NOISE_FLOOR_WATTS);
 
         return ret;
     }
