@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  ingestor:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.ingestor
+    ports:
+      - "50051:50051" # Expose gRPC port
+    volumes:
+      - ./api:/app
+    command: go run cmd/ingestor/main.go
+
+  # Add other services later (fleet_api, postgres, etc.)
