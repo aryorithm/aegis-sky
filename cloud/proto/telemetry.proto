@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package telemetry;
+
+option go_package = "aegis.cloud/proto/telemetry";
+
+import "google/protobuf/timestamp.proto";
+
+// Service for Core units to stream data to the Cloud
+service IngestorService {
+  // A bi-directional stream for high-frequency logs and commands
+  rpc StreamTelemetry(stream TelemetryPacket) returns (stream ServerCommand);
+}
+
+// Data Packet: Core -> Cloud
+message TelemetryPacket {
+  string unit_id = 1; // Unique ID of the Aegis pod
+  google.protobuf.Timestamp timestamp = 2;
+
+  oneof payload {
+    SystemHealth health = 3;
+    DetectionLog detection = 4;
+    EngagementLog engagement = 5;
+  }
+}
+
+// Data Packet: Cloud -> Core
+message ServerCommand {
+  enum CommandType {
+    ACK = 0;
+    REBOOT = 1;
+    PUSH_OTA_UPDATE = 2;
+  }
+  CommandType command = 1;
+  string details = 2; // e.g., URL for the OTA update binary
+}
+
+// --- Payload Types ---
+
+message SystemHealth {
+  float cpu_temperature = 1;
+  float gpu_temperature = 2;
+  float cpu_load_percent = 3;
+  float memory_usage_percent = 4;
+}
+
+message DetectionLog {
+  uint32 track_id = 1;
+  enum ObjectClass {
+    UNKNOWN = 0;
+    DRONE = 1;
+    BIRD = 2;
+  }
+  ObjectClass class_id = 2;
+  float confidence = 3;
+
+  // Position relative to the pod
+  float x_m = 4;
+  float y_m = 5;
+  float z_m = 6;
+}
+
+message EngagementLog {
+  uint32 target_track_id = 1;
+  enum Result {
+    FIRED = 0;
+    HIT_CONFIRMED = 1;
+    MISS = 2;
+  }
+  Result result = 2;
+  // Path to full sensor log in S3 for forensics
+  string sensor_log_uri = 3;
+}
