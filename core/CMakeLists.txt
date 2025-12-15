@@ -65,6 +65,9 @@ target_link_libraries(aegis_flight_sw PUBLIC
     spdlog::spdlog
     CUDA::cudart
     xInfer::Runtime
+    gRPC::grpc++
+    gRPC::grpc
+    protobuf::libprotobuf
 )
 
 # ==============================================================================
